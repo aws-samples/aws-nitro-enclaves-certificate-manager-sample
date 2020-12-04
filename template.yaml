@@ -1,0 +1,759 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: > 
+  "Sample solution to deploy a sample website on EC2 instances with HTTPS/TLS
+  functions performed by Nitro Enclaves"
+
+Metadata:
+  License:
+    Description: >
+      Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+      SPDX-License-Identifier: MIT-0
+      
+      Permission is hereby granted, free of charge, to any person obtaining a copy of this
+      software and associated documentation files (the "Software"), to deal in the Software
+      without restriction, including without limitation the rights to use, copy, modify,
+      merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+      permit persons to whom the Software is furnished to do so.
+      
+      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+      INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+      PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+      HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+      OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+      SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: "Nitro Enclaves ACM"
+  SampleAutoScalingGroupInstanceType:
+    Type: String
+    Default: "c5.xlarge"
+    Description: >
+      Instance type for sample Auto Scaling group. Must be a Virtualized Nitro-based
+      instance type with at least four vCPUs, except t3, t3a, t4g, a1, c6g, c6gd, m6g,
+      m6gd, r6g, and r6gd.
+  HostedZone:
+    Type: AWS::Route53::HostedZone::Id
+    Description: A Route53 Hosted Zone to use for issuing a certificate.
+  DomainName:
+    Type: String
+    Description: >
+      FQDN for the sample to be deployed at. This should be the zone apex
+      or a subdomain of your specified hosted zone.
+  SSMConfig:
+    AllowedValues: 
+        - "true"
+        - "false"
+    Default: "false"
+    Description: >
+      Enable SSM-Agent on your EC2 instances and provide instance profile
+      permissions required for SSM Quick Setup. Permits SSM Management
+      Functions include Systems Manager Session Manager for remote command
+      line access to EC2 instances
+    Type: String
+
+Mappings:
+  Region2Examples:
+    us-east-1:
+      Examples: 'https://s3.amazonaws.com/cloudformation-examples-us-east-1'
+    us-west-2:
+      Examples: 'https://s3-us-west-2.amazonaws.com/cloudformation-examples-us-west-2'
+    us-west-1:
+      Examples: 'https://s3-us-west-1.amazonaws.com/cloudformation-examples-us-west-1'
+    eu-west-1:
+      Examples: 'https://s3-eu-west-1.amazonaws.com/cloudformation-examples-eu-west-1'
+    eu-west-2:
+      Examples: 'https://s3-eu-west-2.amazonaws.com/cloudformation-examples-eu-west-2'
+    eu-west-3:
+      Examples: 'https://s3-eu-west-3.amazonaws.com/cloudformation-examples-eu-west-3'
+    eu-north-1:
+      Examples: 'https://s3-eu-north-1.amazonaws.com/cloudformation-examples-eu-north-1'
+    eu-central-1:
+      Examples: >-
+        https://s3-eu-central-1.amazonaws.com/cloudformation-examples-eu-central-1
+    ap-southeast-1:
+      Examples: >-
+        https://s3-ap-southeast-1.amazonaws.com/cloudformation-examples-ap-southeast-1
+    ap-northeast-1:
+      Examples: >-
+        https://s3-ap-northeast-1.amazonaws.com/cloudformation-examples-ap-northeast-1
+    ap-southeast-2:
+      Examples: >-
+        https://s3-ap-southeast-2.amazonaws.com/cloudformation-examples-ap-southeast-2
+    ap-south-1:
+      Examples: 'https://s3-ap-south-1.amazonaws.com/cloudformation-examples-ap-south-1'
+    us-east-2:
+      Examples: 'https://s3-us-east-2.amazonaws.com/cloudformation-examples-us-east-2'
+    sa-east-1:
+      Examples: 'https://s3-sa-east-1.amazonaws.com/cloudformation-examples-sa-east-1'
+
+  Region2AMI:
+    us-east-1:
+      AMI: 'ami-09a1f053468bd3dcf'
+    us-east-2:
+      AMI: 'ami-0bc56d1a0e5584cb4'
+    us-west-2:
+      AMI: 'ami-0f0124ebc1f49daf5'    
+    ap-east-1:
+      AMI: 'ami-09b985981f1c12e8f'
+    ap-northeast-1:
+      AMI: 'ami-0022e5e5ce88aa323'
+    ap-south-1:
+      AMI: 'ami-042fc7f2cda314ab4'
+    ap-southeast-1:
+      AMI: 'ami-0ed46cdbe7ca952fc'
+    ap-southeast-2:
+      AMI: 'ami-005448c3d2eab01b5'
+    eu-central-1:
+      AMI: 'ami-0acdbcca812cefd03'
+    eu-north-1:
+      AMI: 'ami-031805abef5291506'
+    eu-west-1:
+      AMI: 'ami-09be95e78685c4142'
+    eu-west-2:
+      AMI: 'ami-06ddc10f4b58d3f0b'
+    eu-west-3:
+      AMI: 'ami-00da9426142772b8a'
+    sa-east-1:
+      AMI: 'ami-0b2022ccbbf6bb599'
+
+Conditions:
+  SSMEnable: !Equals [ !Ref SSMConfig , 'true' ]
+
+Resources:
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+
+  NitroEnclavesACMPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: NitroEnclavesACMPolicy
+      Roles:
+       - !Ref InstanceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          Resource: 
+          - !Sub arn:aws:s3:::${AssocEnclaveCert.CertificateS3BucketName}/*
+        - Effect: Allow
+          Action:
+          - kms:Decrypt
+          Resource: !Sub arn:aws:kms:${AWS::Region}:*:key/${AssocEnclaveCert.EncryptionKmsKeyId}
+ 
+  SSMPolicy:
+    Type: AWS::IAM::Policy
+    Condition: SSMEnable
+    Properties:
+      PolicyName: SSMQuickStartPolicy
+      Roles:
+       - !Ref InstanceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+            - ssm:DescribeAssociation
+            - ssm:GetDeployablePatchSnapshotForInstance
+            - ssm:GetDocument
+            - ssm:DescribeDocument
+            - ssm:GetManifest
+            - ssm:GetParameter
+            - ssm:GetParameters
+            - ssm:ListAssociations
+            - ssm:ListInstanceAssociations
+            - ssm:PutInventory
+            - ssm:PutComplianceItems
+            - ssm:PutConfigurePackageResult
+            - ssm:UpdateAssociationStatus
+            - ssm:UpdateInstanceAssociationStatus
+            - ssm:UpdateInstanceInformation
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ssmmessages:CreateControlChannel
+            - ssmmessages:CreateDataChannel
+            - ssmmessages:OpenControlChannel
+            - ssmmessages:OpenDataChannel
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ec2messages:AcknowledgeMessage
+            - ec2messages:DeleteMessage
+            - ec2messages:FailMessage
+            - ec2messages:GetEndpoint
+            - ec2messages:GetMessages
+            - ec2messages:SendReply
+            Resource: '*'
+
+  AssocEnclaveCert:
+    Type: Custom::AssocEnclaveCert
+    Properties:
+      ServiceToken: !GetAtt AssocEnclaveCertFunction.Arn
+      Region: !Ref "AWS::Region"
+      InstanceRole: !Ref InstanceRole
+      InstanceRoleArn: !GetAtt InstanceRole.Arn
+      HostedZoneID: !Ref HostedZone
+      DomainName: !Ref route53RS
+      CertificateARN: !Ref ACMCert
+
+  AssocEnclaveCertFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: AssocEnclaveCertFunction.handler
+      Runtime: nodejs12.x
+      Timeout: 30
+      Role: !GetAtt AssocEnclaveCertLambdaRole.Arn
+      CodeUri: AssocEnclaveCertFunction/
+  
+  AssocEnclaveCertLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: 
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/service-role/"
+      Policies:
+      - PolicyName: lambdaExecution-AssocEnclaveCert
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ec2:AssociateEnclaveCertificateIamRole
+            - ec2:GetAssociatedEnclaveCertificateIamRoles
+            - ec2:DisassociateEnclaveCertificateIamRole
+            Resource:
+            - !Ref ACMCert
+            - !GetAtt [ InstanceRole, Arn ]
+
+
+  route53RS:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref DomainName
+      Comment: NitroEnclaveSample
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt NetworkLoadBalancer.DNSName
+        HostedZoneId: !GetAtt NetworkLoadBalancer.CanonicalHostedZoneID
+      HostedZoneId: !Ref HostedZone
+
+  EnclavesIAMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  ACMCert:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref route53RS
+      DomainValidationOptions:
+        - DomainName: !Ref route53RS
+          HostedZoneId: !Ref HostedZone
+      ValidationMethod: DNS
+  
+  SampleAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: AssocEnclaveCert
+    CreationPolicy:
+      AutoScalingCreationPolicy:
+        MinSuccessfulInstancesPercent: 100
+      ResourceSignal:
+        Timeout: PT15M
+        Count: 1
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: true
+    Properties:
+      MinSize: "2"
+      MaxSize: "4"
+      DesiredCapacity: "2"
+      TargetGroupARNs:
+        - !Ref NLBTargetGroup
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref SampleLaunchTemplate
+        Version: !GetAtt SampleLaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+          PropagateAtLaunch: true
+
+  SampleLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt  EnclavesIAMInstanceProfile.Arn
+        ImageId: !FindInMap
+          - Region2AMI
+          - !Ref 'AWS::Region'
+          - AMI
+        InstanceType: !Ref SampleAutoScalingGroupInstanceType
+        SecurityGroupIds:
+          - !GetAtt VPC.DefaultSecurityGroup
+          - !Ref SecurityGroup
+        EnclaveOptions:
+          Enabled: true
+        UserData: !Base64 
+          'Fn::Join':
+            - ''
+            - - |
+                #!/bin/bash -xe
+              - |
+              - '/opt/aws/bin/cfn-init -v '
+              - '-c install'
+              - '         --stack '
+              - !Ref 'AWS::StackName'
+              - '         --resource SampleLaunchTemplate '
+              - '         --region '
+              - !Ref 'AWS::Region'
+              - |+
+
+              - '/opt/aws/bin/cfn-signal -e $? '
+              - '         --stack '
+              - !Ref 'AWS::StackName'
+              - '         --resource SampleAutoScalingGroup '
+              - '         --region '
+              - !Ref 'AWS::Region'
+              - |+
+
+    Metadata:
+      Comment: Install a simple application
+      'AWS::CloudFormation::Init':
+        configSets:
+          !If
+            - SSMEnable
+            - install:
+              - install_and_enable_cfn_hup
+              - config1
+              - config2
+              - config3
+              - SSM
+            - install: 
+              - install_and_enable_cfn_hup
+              - config1
+              - config2
+              - config3
+        install_and_enable_cfn_hup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                verbose=true
+                interval=5
+              mode: "000400"
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.EC2.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource SampleLaunchTemplate --configsets install --region ${AWS::Region}
+              mode: "000400"
+              owner: root
+              group: root
+            /lib/systemd/system/cfn-hup.service:
+              content: |
+                [Unit]
+                Description=cfn-hup daemon
+                
+                [Service]
+                Type=simple
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+                
+                [Install]
+                WantedBy=multi-user.target
+              mode: "000400"
+              owner: root
+              group: root
+          commands:
+            01enable_cfn_hup:
+              command: systemctl enable cfn-hup.service
+            02start_cfn_hup:
+              command: systemctl start cfn-hup.service
+        config1:
+          files:
+            /usr/share/nginx/html/index.html:
+              content: !Sub  
+                - >-
+                  <img src="${Example}/cloudformation_graphic.png"
+                  alt="AWS CloudFormation Logo"/>
+                  
+                  <h1>Congratulations, you have successfully launched the AWS
+                  CloudFormation sample.</h1>
+                  
+                  <h1>You are viewing this page over a secure connection thanks
+                  to the ACM for Nitro Enclaves Integration</h1>
+
+                  <h2>Instance: INSTANCEID</h2>
+                  <h2>Region: ${AWS::Region}</h2>
+                - Example: !FindInMap 
+                    - Region2Examples
+                    - !Ref 'AWS::Region'
+                    - Examples
+              mode: '000644'
+              owner: root
+              group: root
+            /etc/nginx/nginx.conf:
+              content: !Sub |
+                user nginx;
+                worker_processes auto;
+                error_log /var/log/nginx/error.log;
+                pid /run/nginx.pid;
+                ssl_engine pkcs11;
+
+                # Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+                include /usr/share/nginx/modules/*.conf;
+
+                events {
+                    worker_connections 1024;
+                }
+
+                http {
+                    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                                      '$status $body_bytes_sent "$http_referer" '
+                                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+                    access_log  /var/log/nginx/access.log  main;
+
+                    sendfile            on;
+                    tcp_nopush          on;
+                    tcp_nodelay         on;
+                    keepalive_timeout   65;
+                    types_hash_max_size 4096;
+
+                    include             /etc/nginx/mime.types;
+                    default_type        application/octet-stream;
+
+                    # Load modular configuration files from the /etc/nginx/conf.d directory.
+                    # See http://nginx.org/en/docs/ngx_core_module.html#include
+                    # for more information.
+                    include /etc/nginx/conf.d/*.conf;
+
+                    server {
+                        listen       80;
+                        listen       [::]:80;
+                        server_name  _;
+                        root         /usr/share/nginx/html;
+
+                        # Load configuration files for the default server block.
+                        include /etc/nginx/default.d/*.conf;
+
+                        error_page 404 /404.html;
+                            location = /40x.html {
+                        }
+
+                        error_page 500 502 503 504 /50x.html;
+                            location = /50x.html {
+                        }
+                    }
+
+                # Settings for a TLS enabled server.
+                
+                    server {
+                        listen       443 ssl http2;
+                        listen       [::]:443 ssl http2;
+                        server_name  ${route53RS};
+                        root         /usr/share/nginx/html;
+                
+                        ssl_session_cache shared:SSL:1m;
+                        ssl_session_timeout  10m;
+                        ssl_prefer_server_ciphers on;
+                        ssl_protocols TLSv1.2;
+
+                        # Set this to the stanza path configured in /etc/nitro_enclaves/acm.yaml
+                        include "/etc/pki/nginx/nginx-acm.conf";
+                
+                        # Load configuration files for the default server block.
+                        include /etc/nginx/default.d/*.conf;
+                
+                        error_page 404 /404.html;
+                            location = /40x.html {
+                        }
+                
+                        error_page 500 502 503 504 /50x.html;
+                            location = /50x.html {
+                        }
+                    }
+                }
+              mode: '000644'
+              owner: root
+              group: root
+            /etc/cfn/cfn-hup.conf:
+              content: !Join 
+                - ''
+                - - |
+                    [main]
+                  - stack=
+                  - !Ref 'AWS::StackId'
+                  - |+
+
+                  - region=
+                  - !Ref 'AWS::Region'
+                  - |+
+
+              mode: '000400'
+              owner: root
+              group: root
+        config2:
+          commands: 
+            mv:
+              command: "mv /etc/nitro_enclaves/acm.example.yaml /etc/nitro_enclaves/acm.yaml"
+            sedI:
+              command: !Sub |
+                sed -i "s@^\(.*\)certificate_arn:.*@\1certificate_arn:\ ${ACMCert}@g"  /etc/nitro_enclaves/acm.yaml
+        config3:
+          commands:
+            htmlInstance:
+              cwd: /usr/share/nginx/html
+              command: |
+                sed -i 's@INSTANCEID@'"$(curl http://169.254.169.254/latest/meta-data/instance-id)"'@g' index.html
+            NitroEnclavesACMStart: 
+              command: "systemctl start nitro-enclaves-acm.service"
+            NitroEnclavesASMEnable:
+              command: "systemctl enable nitro-enclaves-acm"
+        SSM:
+          commands:
+            SSMEnable:
+              command: "systemctl enable amazon-ssm-agent"
+            SSMStart:
+              command: "sudo systemctl start amazon-ssm-agent"
+
+  NetworkLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Type: network
+      Subnets: !Split
+        - "," 
+        - !Join
+          - ","
+          - 
+            - !Ref "PublicSubnet1"
+            - !Ref "PublicSubnet2"
+  NLBListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref NLBTargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: 443
+      Protocol: TCP
+  NLBTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthyThresholdCount: 3
+      Port: 443
+      Protocol: TCP
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+  
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: !Ref EnvironmentName
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: Nitro Enclaves SG
+      GroupDescription: Allow 443 from public subnets only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  NATGateway:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      AllocationId: !GetAtt NatGw1ElasticIP.AllocationId
+      Tags:
+        - Key: Name
+          Value: NAT GW A
+  NatGw1ElasticIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: "10.0.0.0/24"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+  
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: "10.0.1.0/24"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: "10.0.2.0/24"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: "10.0.3.0/24"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
+   
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+Outputs:
+  SampleAutoScalingGroup:
+    Description: Sample Auto Scaling group 
+    Value: !Ref SampleAutoScalingGroup
+  LaunchTemplate:
+    Description: Sample Launch Template for Auto Scaling group
+    Value: !Ref SampleLaunchTemplate
+  SSMTargetTag:
+    Condition: SSMEnable
+    Description: >
+      Tag for identifying EC2 instances deployed by
+      the stack.
+    Value: !Sub |
+      Key: aws:autoscaling:groupName
+      Value: ${SampleAutoScalingGroup}
+  URL:
+    Description: URL of the website
+    Value: !Join 
+      - ''
+      - 
+        - 'https://'
+        - !Ref route53RS

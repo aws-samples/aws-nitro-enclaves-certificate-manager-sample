@@ -1,0 +1,10 @@
+{
+  "name": "assoc-enclave-custom-resource",
+  "version": "1.0.0",
+  "description": "Custom Resource to Associate an ACM Cert with an IAM role for Nitro Enclaves",
+  "main": "AssocEnclaveCertFunction.js",
+  "author": "J.D. Bean",
+  "dependencies": {
+    "aws-sdk": "^2.798.0"
+  }
+}
