@@ -10,7 +10,7 @@ constrained environment to host security-critical applications. Nitro Enclaves
 includes cryptographic attestation for your software, so that you can be sure
 that only authorized code is running, as well as integration with the
 [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/), so that only
-your enclaves can access sensitive material. Nitro Enclaves Enclaves are fully
+your enclaves can access sensitive material. Nitro Enclaves are fully
 isolated virtual machines, hardened, and highly constrained. They have no
 persistent storage, no interactive access, and no external networking.
 Communication between your instance and your enclave is done using a secure
