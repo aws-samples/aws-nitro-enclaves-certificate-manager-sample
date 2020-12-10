@@ -10,12 +10,12 @@ constrained environment to host security-critical applications. Nitro Enclaves
 includes cryptographic attestation for your software, so that you can be sure
 that only authorized code is running, as well as integration with the
 [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/), so that only
-your enclaves can access sensitive material. Nitro Enclaves are fully
-isolated virtual machines, hardened, and highly constrained. They have no
-persistent storage, no interactive access, and no external networking.
-Communication between your instance and your enclave is done using a secure
-local channel. Even a root user or an admin user on the instance will not be
-able to access or SSH into the enclave.
+your enclaves can access sensitive material. Nitro Enclaves are fully isolated
+virtual machines, hardened, and highly constrained. They have no persistent
+storage, no interactive access, and no external networking. Communication
+between your instance and your enclave is done using a secure local channel.
+Even a root user or an admin user on the instance will not be able to access or
+SSH into the enclave.
 
 This sample solution automates the deployment of a highly available sample web
 page behind an AWS Network Load Balancer (NLB). The NLB uses TCP passthrough to
@@ -26,7 +26,7 @@ This sample solution uses
 [AWS Certificate Manager (ACM) for Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/features/)
 integration to automatically issue and provision an x509 certificate from
 [Amazon Certificate Manager](https://aws.amazon.com/certificate-manager/) within
-the enclaves of autoscaling group of EC2 instance where it is used to perform
+the enclaves of an autoscaling group of EC2 instances where it is used to perform
 cryptographic operations for the web server processes via the PKCS #11 SSL
 engine of nginx. At no time is the certificate private key generated for this
 solution made available in plaintext to the primary EC2 instance. The private
@@ -46,7 +46,7 @@ This solution deploys the following components:
 - A Route53 A record
 - A Network Access Control List
 - A Security Group
-- A ACM certificate for the provided domain
+- An ACM certificate for the provided domain
 - A DNS validation record in Route53 for the certificate
 - A sample EC2 Auto Scaling group with two instances using a Nitro Enclaves
   enabled sample Amazon Linux 2 AMI
@@ -162,8 +162,8 @@ EC2 instances including:
 - A scheduled, monthly update of the CloudWatch agent.
 
 Systems Manager can also be used to establish a console session on the EC2
-instances in the solution's private subnets. To user SSM Quick Setup, specify
-the EC2 instance role created by this solution as the
+instances in the solution's private subnets. To use SSM Quick Setup, specify the
+EC2 instance role created by this solution as the
 [SSM Quick Setup instance profile role](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-quick-setup.html#quick-setup-instance-profile).
 For your SSM Quick Setup target, specify instance tags and enter the
 `aws:autoscaling:groupName` key/value pair in the solution stack output.
