@@ -26,11 +26,12 @@ This sample solution uses
 [AWS Certificate Manager (ACM) for Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/features/)
 integration to automatically issue and provision an x509 certificate from
 [Amazon Certificate Manager](https://aws.amazon.com/certificate-manager/) within
-the enclaves of an autoscaling group of EC2 instances where it is used to perform
-cryptographic operations for the web server processes via the PKCS #11 SSL
-engine of nginx. At no time is the certificate private key generated for this
-solution made available in plaintext to the primary EC2 instance. The private
-key is decrypted and utilized only in the Nitro Enclave of each instance.
+the enclaves of an autoscaling group of EC2 instances where it is used to
+perform cryptographic operations for the web server processes via the PKCS #11
+SSL engine of nginx. At no time is the certificate private key generated for
+this solution made available in plaintext to the primary EC2 instance. The
+private key is decrypted and utilized only in the Nitro Enclave of each
+instance.
 
 Optionally the solution can help configure the EC2 instances for management and
 remote access via
@@ -60,7 +61,9 @@ This solution deploys the following components:
 
 **Note:** For easiest deployment you can create a
 [Cloud9 environment](https://docs.aws.amazon.com/cloud9/latest/user-guide/create-environment.html),
-it already has the below requirements installed.
+it already has the below requirements installed. Note, however, that you'll need
+a volume with additional free space to accomodate the docker build. 10-20GB of
+additional volume space should be sufficient.
 
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
 - [Docker installed](https://www.docker.com/community-edition)
@@ -90,13 +93,13 @@ aws s3 --region REPLACE_WITH_YOUR_REGION mb s3://REPLACE_WITH_YOUR_BUCKET_NAME
 Next, clone the ec2-auto scaling-instance-refresh-sample repository to your
 local workstation or to your Cloud9 environment.
 
-```
+```bash
 git clone https://github.com/aws-samples/aws-nitro-enclaves-certificate-manager-sample.git
 ```
 
 Next, change directories to the root directory for this example solution.
 
-```
+```bash
 cd aws-nitro-enclaves-certificate-manager-sample
 ```
 
@@ -134,7 +137,7 @@ through the
 [AWS Systems Manager Quick Setup](https://console.aws.amazon.com/systems-manager/quick-setup)
 add the following option to your command's parameter overrides:
 
-```
+```bash
   SSMConfig="true"
 ```
 
