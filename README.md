@@ -73,7 +73,7 @@ additional volume space should be sufficient.
 Additionally you will require:
 
 - Access to an AWS account with permissions to create the above resources
-- A Route53 Hosted Zone ID
+- A Route53 Public Hosted Zone ID
 - The name of an available domain within that zone to use for deploying the
   solution and issuing a certificate with Amazon Certificate Manager.
 
