@@ -122,8 +122,7 @@ SAM resources.
 
 ```bash
 sam deploy \
-  --template-file /Users/jdbean/Documents/Code/Enclave-CFT/template.yaml \
-  --s3-bucket REPLACE_WITH_YOUR_S3_BUCKET_NAME \
+  --template-file packaged.yaml\
   --region REPLACE_WITH_YOUR_REGION \
   --stack-name nitro-enclave-acm \
   --capabilities CAPABILITY_IAM \
