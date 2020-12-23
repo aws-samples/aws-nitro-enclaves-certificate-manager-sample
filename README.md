@@ -82,7 +82,7 @@ Additionally you will require:
 Once you've installed the requirements listed above, open a terminal session as
 you'll need to run through a few commands to deploy the solution.
 
-First, we need an `S3 bucket` where we can upload the Lambda function packaged
+First, we need an S3 bucket where we can upload the Lambda function packaged
 as ZIP before we deploy anything - If you don't have a S3 bucket to store code
 artifacts then, this is a good time to create one:
 
@@ -90,7 +90,7 @@ artifacts then, this is a good time to create one:
 aws s3 --region REPLACE_WITH_YOUR_REGION mb s3://REPLACE_WITH_YOUR_BUCKET_NAME
 ```
 
-Next, clone the ec2-auto scaling-instance-refresh-sample repository to your
+Next, clone the aws-nitro-enclaves-certificate-manager-sample repository to your
 local workstation or to your Cloud9 environment.
 
 ```bash
