@@ -33,6 +33,8 @@ this solution made available in plaintext to the primary EC2 instance. The
 private key is decrypted and utilized only in the Nitro Enclave of each
 instance.
 
+![Architecture Diagram](/images/architecture-diagram.png)
+
 Optionally the solution can help configure the EC2 instances for management and
 remote access via
 [AWS Systems Manager (SSM)](https://aws.amazon.com/systems-manager/).
