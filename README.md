@@ -63,8 +63,7 @@ This solution deploys the following components:
 
 **Note:** For easiest deployment you can create a
 [Cloud9 environment](https://docs.aws.amazon.com/cloud9/latest/user-guide/create-environment.html),
-it already has the below requirements installed. Note, however, that you'll need
-a volume with additional free space to accomodate the docker build. 10-20GB of
+it already has the below requirements installed. Note, however, that you'll need to [expand your Cloud 9 environment volume](https://docs.aws.amazon.com/cloud9/latest/user-guide/move-environment.html#move-environment-resize) with additional free space to accomodate the docker build. 10-20GB of
 additional volume space should be sufficient.
 
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
